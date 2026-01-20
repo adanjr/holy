@@ -79,6 +79,15 @@ export const makeRenderQueue = ({
         composition,
         inputProps,
         codec: "h264",
+
+        chromiumOptions: {
+          executablePath: "/usr/bin/google-chrome-stable",
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+          ],
+        },
         onProgress: (progress) => {
           console.info(`${jobId} render progress:`, progress.progress);
           jobs.set(jobId, {
