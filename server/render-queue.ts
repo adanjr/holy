@@ -5,6 +5,8 @@ import {
 } from "@remotion/renderer";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { uploadToS3 } from "./s3";
+import fs from "node:fs/promises";
 
 interface JobData {
   titleText: string;
@@ -73,6 +75,8 @@ export const makeRenderQueue = ({
         inputProps,
       });
 
+      const outputPath = path.join(rendersDir, `${jobId}.mp4`);
+
       await renderMedia({
         cancelSignal,
         serveUrl,
@@ -97,12 +101,21 @@ export const makeRenderQueue = ({
             data: job.data,
           });
         },
-        outputLocation: path.join(rendersDir, `${jobId}.mp4`),
+        outputLocation: outputPath,
       });
+
+      const s3Key = `renders/${jobId}.mp4`;
+
+      const publicUrl = await uploadToS3({
+        filePath: outputPath,
+        key: s3Key,
+      });
+
+      await fs.unlink(outputPath);
 
       jobs.set(jobId, {
         status: "completed",
-        videoUrl: `http://localhost:${port}/renders/${jobId}.mp4`,
+        videoUrl: publicUrl,
         data: job.data,
       });
     } catch (error) {
