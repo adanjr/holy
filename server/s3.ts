@@ -22,7 +22,6 @@ export async function uploadToS3({
       Key: key,
       Body: fileStream,
       ContentType: "video/mp4",
-      ServerSideEncryption: "aws:kms",
     })
   );
 
