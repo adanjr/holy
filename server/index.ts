@@ -4,7 +4,7 @@ import { makeRenderQueue } from "./render-queue";
 import { bundle } from "@remotion/bundler";
 import path from "node:path";
 import { ensureBrowser } from "@remotion/renderer";
-
+import cors from "cors";
 
 const { PORT = 3000, REMOTION_SERVE_URL } = process.env;
 
@@ -18,6 +18,8 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
     serveUrl: remotionBundleUrl,
     rendersDir,
   });
+
+  app.use(cors({ origin: "*" }));
 
   // Host renders on /renders
   app.use("/renders", express.static(rendersDir));
