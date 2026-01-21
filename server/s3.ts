@@ -22,9 +22,8 @@ export async function uploadToS3({
       Key: key,
       Body: fileStream,
       ContentType: "video/mp4",
-      ACL: "public-read",
     })
   );
 
-  return `https://${BUCKET}.s3.amazonaws.com/${key}`;
+  return `s3://${BUCKET}/${key}`;
 }
