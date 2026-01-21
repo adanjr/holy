@@ -14,6 +14,12 @@ export async function uploadToS3({
   filePath: string;
   key: string;
 }) {
+
+  console.log("[ENV]", {
+    AWS_REGION: process.env.AWS_REGION,
+    S3_BUCKET: process.env.S3_BUCKET,
+    });
+
   console.log(`[S3] Uploading ${filePath} to ${BUCKET}/${key}`);
 
   // Leer el archivo como buffer en lugar de stream
