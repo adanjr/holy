@@ -85,7 +85,7 @@ async function main() {
 
   const app = setupApp({ remotionBundleUrl });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, () => {
     console.info(`Server is running on port ${PORT}`);
   });
 }
