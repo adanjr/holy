@@ -68,6 +68,8 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
     res.json({ message: "Job cancelled" });
   });
 
+  app.use("/renders", express.static(rendersDir));
+
   return app;
 }
 
