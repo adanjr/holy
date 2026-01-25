@@ -22,7 +22,7 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
   app.use(cors({ origin: "*" }));
 
   // Host renders on /renders
-  app.use("/renders", express.static(rendersDir));
+ 
   app.use(express.json());
 
   // Endpoint to create a new job
