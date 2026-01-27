@@ -27,14 +27,24 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
 
   // Endpoint to create a new job
   app.post("/renders", async (req, res) => {
-    const titleText = req.body?.titleText || "Hello, world!";
+    const { inputProps, videoConfig } = req.body;
 
-    if (typeof titleText !== "string") {
-      res.status(400).json({ message: "titleText must be a string" });
-      return;
+    if (!inputProps?.scenes?.length) {
+      return res.status(400).json({
+        error: "inputProps.scenes is required",
+      });
     }
 
-    const jobId = queue.createJob({ titleText });
+    if (!videoConfig?.durationInFrames) {
+      return res.status(400).json({
+        error: "videoConfig is required",
+      });
+    }   
+
+    const jobId = queue.createJob({ 
+      inputProps,
+      videoConfig,
+     });
 
     res.json({ jobId });
   });

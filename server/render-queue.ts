@@ -75,7 +75,14 @@ export const makeRenderQueue = ({
     });
 
     try {
-      const { inputProps, videoConfig } = job.data;
+      const { inputProps } = job.data;
+
+      const videoConfig = job.data.videoConfig ?? {
+        fps: 30,
+        width: 1280,
+        height: 720,
+        durationInFrames: 300, // fallback seguro
+      };
 
       const composition = await selectComposition({
         serveUrl,
