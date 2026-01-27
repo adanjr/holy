@@ -9,8 +9,18 @@ import { uploadToS3 } from "./s3";
 import fs from "node:fs/promises";
 
 interface JobData {
-  titleText: string;
+  inputProps: {
+    scenes: any[];
+    voiceUrl?: string | null;
+  };
+  videoConfig: {
+    fps: number;
+    width: number;
+    height: number;
+    durationInFrames: number;
+  };
 }
+
 
 type JobState =
   | {
@@ -35,7 +45,7 @@ type JobState =
       data: JobData;
     };
 
-const compositionId = "HelloWorld";
+const compositionId = "Video";
 
 export const makeRenderQueue = ({
   port,
@@ -65,9 +75,7 @@ export const makeRenderQueue = ({
     });
 
     try {
-      const inputProps = {
-        titleText: job.data.titleText,
-      };
+      const { inputProps, videoConfig } = job.data;
 
       const composition = await selectComposition({
         serveUrl,
@@ -83,6 +91,11 @@ export const makeRenderQueue = ({
         composition,
         inputProps,
         codec: "h264",
+
+        fps: videoConfig.fps,
+        width: videoConfig.width,
+        height: videoConfig.height,
+        durationInFrames: videoConfig.durationInFrames,
 
         chromiumOptions: {
           executablePath: "/usr/bin/google-chrome-stable",
