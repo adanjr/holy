@@ -97,12 +97,7 @@ export const makeRenderQueue = ({
         serveUrl,
         composition,
         inputProps,
-        codec: "h264",
-
-        fps: videoConfig.fps,
-        width: videoConfig.width,
-        height: videoConfig.height,
-        durationInFrames: videoConfig.durationInFrames,
+        codec: "h264",       
 
         chromiumOptions: {
           executablePath: "/usr/bin/google-chrome-stable",

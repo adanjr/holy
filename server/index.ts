@@ -35,12 +35,6 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
       });
     }
 
-    if (!videoConfig?.durationInFrames) {
-      return res.status(400).json({
-        error: "videoConfig is required",
-      });
-    }   
-
     const jobId = queue.createJob({ 
       inputProps,
       videoConfig,

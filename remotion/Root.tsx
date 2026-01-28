@@ -11,15 +11,29 @@ export const RemotionRoot: React.FC = () => {
         // npx remotion render HelloWorld
         id="Video"
         component={Video}
-        durationInFrames={300}
+        durationInFrames={1}
         fps={30}
-        width={1920}
-        height={1080}
+        width={1280}
+        height={720}
         defaultProps={{
           scenes: [],
           voiceUrl: null,
         }}
-       
+       calculateMetadata={({ props }) => {
+        const fps = 30;
+        const scenes = props.scenes ?? [];
+
+        const durationInFrames = scenes.reduce(
+          (acc: number, scene: any) =>
+            acc + (scene.duration || 5) * fps,
+          0
+        );
+
+        return {
+          durationInFrames,
+          fps,
+        };
+      }}
       />
     </>
   );
