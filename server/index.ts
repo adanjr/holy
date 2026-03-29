@@ -83,7 +83,7 @@ async function main() {
   const remotionBundleUrl = REMOTION_SERVE_URL
     ? REMOTION_SERVE_URL
     : await bundle({
-        entryPoint: path.resolve("remotion/index.ts"),
+        entryPoint: path.resolve("../remotion/index.ts"),
         onProgress(progress) {
           console.info(`Bundling Remotion project: ${progress}%`);
         },
