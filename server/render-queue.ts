@@ -5,7 +5,8 @@ import {
 } from "@remotion/renderer";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { uploadToS3 } from "./s3";
+//import { uploadToS3 } from "./s3";
+import { uploadToAzure } from "./azure-blob";
 import fs from "node:fs/promises";
 
 interface JobData {
@@ -119,12 +120,18 @@ export const makeRenderQueue = ({
         outputLocation: outputPath,
       });
 
-      const s3Key = `renders/${jobId}.mp4`;
+      //const s3Key = `renders/${jobId}.mp4`;
 
-      const publicUrl = await uploadToS3({
-        filePath: outputPath,
-        key: s3Key,
-      });
+      //const publicUrl = await uploadToS3({
+      //  filePath: outputPath,
+      //  key: s3Key,
+      //});
+      const fileName = `${jobId}.mp4`;
+
+      const publicUrl = await uploadToAzure(
+        outputPath,
+        fileName
+      );
 
       await fs.unlink(outputPath);
 
