@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useCurrentFrame } from "remotion";
-import { AbsoluteFill, Sequence,Html5Audio } from "remotion";
+import { AbsoluteFill, Sequence, Html5Audio } from "remotion";
 import { Scene } from "./Scene";
 
 type SubtitlesStyle = {
@@ -46,12 +46,21 @@ type FinalCompositionProps = {
   musicTracks?: MusicTrack[];
   watermark?: WaterMark;
   logo?: LogoOverlay;
-  subtitles?: any[]; 
+  subtitles?: any[];
   subtitlesEnabled?: boolean;
   subtitlesStyle?: SubtitlesStyle;
 };
 
-export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, subtitles = [], subtitlesEnabled = false, subtitlesStyle = {}, }: FinalCompositionProps) => {
+export const Video = ({
+  scenes,
+  voiceUrl,
+  musicTracks = [],
+  watermark,
+  logo,
+  subtitles = [],
+  subtitlesEnabled = false,
+  subtitlesStyle = {},
+}: FinalCompositionProps) => {
   const fps = 30;
 
   const frame = useCurrentFrame();
@@ -66,9 +75,10 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
     let currentStartFrame = 0;
 
     const sequences = scenes.map((scene, index) => {
+      // 🔥 FIX: Redondear para obtener frames enteros
       const durationInFrames = Math.max(
         1,
-        (scene.duration || 5) * fps
+        Math.round((scene.duration || 5) * fps)
       );
 
       const seq = {
@@ -84,7 +94,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
     });
 
     return { sequences, totalDuration: currentStartFrame };
-  }, [scenes]);
+  }, [scenes, fps]); // 🔥 Agregar fps a dependencias
 
   const getSubtitlePosition = () => {
     switch (subtitlesStyle.position) {
@@ -106,7 +116,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
   };
 
   const getPositionStyle = (position?: string) => {
-    const margin = 40; // 🔥 SAFE MARGIN (esto arregla el corte)
+    const margin = 40;
 
     switch (position) {
       case "top-left":
@@ -133,8 +143,6 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
     }
   };
 
-  const positionStyle = getPositionStyle();
-
   return (
     <AbsoluteFill className="bg-black">
       {/* 🎬 Escenas encadenadas */}
@@ -148,6 +156,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
         <AbsoluteFill style={{ pointerEvents: "none" }}>
           <img
             src={watermark.url}
+            alt="watermark"
             style={{
               position: "absolute",
               top: "50%",
@@ -182,6 +191,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
               >
                 <img
                   src={watermark.url}
+                  alt={`watermark-tile-${i}`}
                   style={{
                     width: `${watermark.size || 20}%`,
                     opacity: watermark.opacity ?? 0.1,
@@ -198,6 +208,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
         <AbsoluteFill style={{ pointerEvents: "none" }}>
           <img
             src={logo.url}
+            alt="logo"
             style={{
               position: "absolute",
               ...getPositionStyle(logo.position),
@@ -209,9 +220,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
       )}
 
       {/* 🎧 Audio sincronizado */}
-      {voiceUrl && (
-        <Html5Audio src={voiceUrl} />
-      )}
+      {voiceUrl && <Html5Audio src={voiceUrl} />}
 
       {/* 📝 Subtítulos */}
       {subtitles.map((sub, index) => {
@@ -229,9 +238,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
 
         const safeProgress = Math.min(1, Math.max(0, progress));
 
-        const activeWordIndex = Math.floor(
-          safeProgress * (words.length - 1)
-        );
+        const activeWordIndex = Math.floor(safeProgress * (words.length - 1));
 
         return (
           <Sequence
@@ -249,9 +256,9 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
               <div
                 style={{
                   backgroundColor:
-                  subtitlesStyle.mode === "tiktok"
-                    ? "transparent"
-                    : subtitlesStyle.background ?? "rgba(0,0,0,0.6)",
+                    subtitlesStyle.mode === "tiktok"
+                      ? "transparent"
+                      : subtitlesStyle.background ?? "rgba(0,0,0,0.6)",
                   color: subtitlesStyle.color ?? "#ffffff",
                   padding: "12px 20px",
                   borderRadius: 12,
@@ -261,7 +268,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
                   maxWidth: "80%",
                 }}
               >
-                 {subtitlesStyle.mode === "tiktok" ? (
+                {subtitlesStyle.mode === "tiktok" ? (
                   <div
                     style={{
                       display: "flex",
@@ -272,7 +279,8 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
                   >
                     {words.map((word, i) => {
                       const isActive =
-                        subtitlesStyle.mode === "tiktok" && i === activeWordIndex;
+                        subtitlesStyle.mode === "tiktok" &&
+                        i === activeWordIndex;
 
                       return (
                         <span
@@ -313,7 +321,7 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
           const durationInFrames = Math.max(
             1,
             Math.floor((track.endTime - track.startTime) * fps)
-          );           
+          );
 
           return (
             <Sequence
@@ -323,9 +331,9 @@ export const Video = ({ scenes, voiceUrl, musicTracks = [], watermark, logo, sub
             >
               <Html5Audio
                 src={track.url}
-                startFrom={Math.floor(track.trimStart * fps)} // 🔥 recorte inicial
-                endAt={Math.floor(track.trimEnd * fps)}       // 🔥 recorte final
-                volume={0.2} // puedes hacerlo dinámico luego
+                startFrom={Math.floor(track.trimStart * fps)}
+                endAt={Math.floor(track.trimEnd * fps)}
+                volume={0.2}
               />
             </Sequence>
           );
