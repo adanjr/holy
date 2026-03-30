@@ -1,18 +1,29 @@
 "use client";
 
-import { useMemo } from "react";
-import {
-  AbsoluteFill,
-  Sequence,
-  useCurrentFrame,
-  Img,
-  OffthreadVideo,
-  Html5Audio,
-} from "remotion";
+import { useEffect, useRef, useMemo } from "react";
+import { AbsoluteFill, Sequence, useCurrentFrame,Img, Html5Video, OffthreadVideo, Html5Audio  } from "remotion";
 import { interpolate, Easing } from "remotion";
-import { AnimationRenderer } from "./animations/AnimationRenderer";
+import { AnimationRenderer } from "./animations/AnimationRenderer";  
 
-// Tipos
+export type SceneModel = {
+  id: string
+  description?: string
+  narration?: string
+  startTime?: number
+  endTime?: number
+  duration?: number
+
+  assets?: any[]
+  sceneAssets?: any[]
+  sceneEntities?: any[]
+  textOverlays?: any[]
+}
+
+type SceneProps = {
+  scene: SceneModel
+  voiceUrl?: string | null
+}
+
 type SceneEffect = {
   fx: string;
   startTime: number;
@@ -22,87 +33,112 @@ type SceneEffect = {
 type SceneAsset = {
   id: string;
   type: "IMAGE" | "VIDEO" | "ANIMATION";
-  name?: string;
   originalUrl: string;
   storedUrl?: string;
-  duration?: number;
+  name: string;
   order?: number;
+  duration?: number; 
   animationData?: any;
   effects?: SceneEffect[];
 };
 
-type SceneModel = {
-  id: string;
-  assets?: SceneAsset[];
-  textOverlays?: any[];
-  startTime?: number;
-  endTime?: number;
-};
-
-// Función para aplicar efectos sobre un asset
-const applyEffects = (
+const applyEffects2 = (
   fxList: SceneEffect[] | undefined,
   frameInSequence: number,
-  fps: number
+  fps: number // Añadimos fps como parámetro
 ): string[] => {
   if (!fxList?.length) return [];
   const transforms: string[] = [];
+  const currentTimeInSeconds = frameInSequence / fps;
 
   fxList.forEach(({ fx, startTime, duration }) => {
-    const localFrame = frameInSequence - startTime * fps;
-    if (localFrame < 0 || localFrame > duration * fps) return;
+    if (currentTimeInSeconds < startTime || currentTimeInSeconds > startTime + duration) return;
 
-    switch (fx) {
-      case "zoomIn":
-        transforms.push(
-          `scale(${interpolate(localFrame, [0, duration * fps], [1, 1.2], {
-            extrapolateRight: "clamp",
-          })})`
-        );
-        break;
-      case "zoomOut":
-        transforms.push(
-          `scale(${interpolate(localFrame, [0, duration * fps], [1.2, 1], {
-            extrapolateRight: "clamp",
-          })})`
-        );
-        break;
-      case "panLeft":
-        transforms.push(
-          `translateX(${interpolate(localFrame, [0, duration * fps], [0, -100], {
-            easing: Easing.linear,
-          })}px)`
-        );
-        break;
-      case "panRight":
-        transforms.push(
-          `translateX(${interpolate(localFrame, [0, duration * fps], [0, 100], {
-            easing: Easing.linear,
-          })}px)`
-        );
-        break;
-      case "tiltUp":
-        transforms.push(
-          `translateY(${interpolate(localFrame, [0, duration * fps], [0, -80], {
-            easing: Easing.linear,
-          })}px)`
-        );
-        break;
-      case "tiltDown":
-        transforms.push(
-          `translateY(${interpolate(localFrame, [0, duration * fps], [0, 80], {
-            easing: Easing.linear,
-          })}px)`
-        );
-        break;
-    }
+    const localFrame = frameInSequence - startTime * fps; 
+    // ... (resto de tu lógica de switch case igual)
   });
-
   return transforms;
 };
 
-// Componente para cada asset tipo imagen
-const ImageAsset = ({ asset, fps }: { asset: SceneAsset; fps: number }) => {
+ const applyEffects = (
+    fxList: SceneEffect[] | undefined,
+    frameInSequence: number,
+    fps: number // Añadimos fps como parámetro // (Corrección 2a: Usar nombre descriptivo)
+  ): string[] => {
+    if (!fxList?.length) return [];
+
+    const transforms: string[] = [];
+    // Usamos el frame relativo para calcular el tiempo
+    const currentTimeInSeconds = frameInSequence / fps;
+
+    fxList.forEach(({ fx, startTime, duration }) => {
+      
+      // Verificamos si el efecto está activo dentro del tiempo de la Sequence
+      if (
+        currentTimeInSeconds < startTime ||
+        currentTimeInSeconds > startTime + duration
+      ) {
+        return;
+      }
+      
+      // (Corrección 2b: localFrame corregido)
+      // frameInSequence ya es relativo, solo restamos el startTime del efecto (que ahora es relativo a 0)
+      const localFrame = frameInSequence - startTime * fps; 
+
+      switch (fx) {
+        case "zoomIn": {
+          const scale = interpolate(localFrame, [0, duration * fps], [1, 1.2], {
+            extrapolateRight: "clamp",
+          });
+          transforms.push(`scale(${scale})`);
+          break;
+        }
+        case "zoomOut": {
+          const scale = interpolate(localFrame, [0, duration * fps], [1.2, 1], {
+            extrapolateRight: "clamp",
+          });
+          transforms.push(`scale(${scale})`);
+          break;
+        }
+        case "panLeft": {
+          const translateX = interpolate(localFrame, [0, duration * fps], [0, -100], {
+            extrapolateRight: "clamp",
+            easing: Easing.linear,
+          });
+          transforms.push(`translateX(${translateX}px)`);
+          break;
+        }
+        case "panRight": {
+          const translateX = interpolate(localFrame, [0, duration * fps], [0, 100], {
+            extrapolateRight: "clamp",
+            easing: Easing.linear,
+          });
+          transforms.push(`translateX(${translateX}px)`);
+          break;
+        }
+        case "tiltUp": {
+          const translateY = interpolate(localFrame, [0, duration * fps], [0, -80], {
+            extrapolateRight: "clamp",
+            easing: Easing.linear,
+          });
+          transforms.push(`translateY(${translateY}px)`);
+          break;
+        }
+        case "tiltDown": {
+          const translateY = interpolate(localFrame, [0, duration * fps], [0, 80], {
+            extrapolateRight: "clamp",
+            easing: Easing.linear,
+          });
+          transforms.push(`translateY(${translateY}px)`);
+          break;
+        }
+      }
+    });
+
+    return transforms;
+  };
+
+const ImageAsset = ({ asset, fps }: { asset: SceneAsset , fps: number }) => {
   const frame = useCurrentFrame();
   const transforms = applyEffects(asset.effects, frame, fps);
 
@@ -119,121 +155,236 @@ const ImageAsset = ({ asset, fps }: { asset: SceneAsset; fps: number }) => {
   );
 };
 
-// Componente para cada asset tipo video
 const VideoAsset = ({ asset }: { asset: SceneAsset }) => {
   return (
     <OffthreadVideo
       src={asset.storedUrl || asset.originalUrl}
       muted
-      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+      }}
     />
   );
 };
 
-// Scene principal
-export const Scene = ({ scene, voiceUrl }: { scene: SceneModel; voiceUrl?: string | null }) => {
+
+export const Scene = ({ scene, voiceUrl }: SceneProps) => {
+  //const audioRef = useRef<HTMLAudioElement>(null);
   const fps = 30;
-  const frame = useCurrentFrame();
 
-  if (!scene) return null;
-
-  // 🔹 Normalizar assets
+  // 🧩 Compatibilidad y NORMALIZACIÓN DE TIEMPOS (Corrección 1: Normalización)
   const assets: SceneAsset[] = useMemo(() => {
-    const rawAssets = scene.assets || [];
-    return rawAssets
-      .map((a) => ({
-        id: a.id || a.asset?.id,
-        type: a.type || a.asset?.type,
-        name: a.name || a.asset?.name,
-        originalUrl: a.originalUrl || a.asset?.originalUrl,
-        storedUrl: a.storedUrl || a.asset?.storedUrl,
-        duration: a.duration ?? a.asset?.duration ?? 6,
+    const rawAssets = scene?.assets || scene?.sceneAssets || [];
+    
+    return rawAssets.map((a: any) => {
+      // Obtenemos el tiempo de inicio del asset en la escena (e.g., 0 o 4)
+      const assetStartTime = a.startTime ?? 0;
+
+      return {
+        id: a.asset?.id || a.id,
+        type: a.asset?.type || a.type,
+        name: a.asset?.name || a.name,
+        originalUrl: a.asset?.originalUrl || a.originalUrl,
+        storedUrl: a.asset?.storedUrl || a.storedUrl,
+        previewUrl: a.asset?.previewUrl || a.previewUrl,
         order: a.order,
-        animationData: a.animationData || a.asset?.animationData,
-        effects: (a.effects || []).map((fx: any) => ({
-          ...fx,
-          startTime: Math.max(0, fx.startTime ?? 0),
+        duration: a.duration ?? a.asset?.duration ?? 8,
+        animationData: a.animationEffect?.data || a.animationData,
+        // Normalizamos el startTime del efecto para que sea relativo a 0
+        // en la Sequence de Remotion.
+        effects: (a.effects || []).map((effect: any) => ({
+          ...effect,
+          startTime: Math.max(0, (effect.startTime ?? 0) - assetStartTime),
         })),
-      }))
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      };
+    });
   }, [scene]);
 
-  if (!assets.length && !scene.textOverlays?.length && !voiceUrl) return null;
+  if (!assets.length) return null;
 
-  // 🔹 Render text overlays
-  const renderTextOverlays = () => {
-    return (scene.textOverlays || []).map((overlay: any, index: number) => {
+  // 🔽 Ordena los assets según su "order"
+  const sortedAssets: SceneAsset[] = useMemo(
+    () => [...assets].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [assets]
+  );
+
+  // 🔧 Aplica efectos según el tiempo
+ 
+
+  // 📝 Render de Text Overlays
+  const renderTextOverlays = (fps: number) => {
+    if (!scene?.textOverlays?.length) return null;
+
+    return scene.textOverlays.map((overlay: any) => {
       const from = Math.floor((overlay.startTime ?? 0) * fps);
       const durationInFrames = Math.floor((overlay.duration ?? 2) * fps);
 
-      const text = overlay.text || overlay.sceneEntity?.entity?.name || "";
+      const TextOverlay = () => {
+        const frame = useCurrentFrame();
+        const localFrame = frame; // frame relativo al inicio del Sequence
+        // Ajustamos el frame según transitionDelay
+        const adjustedFrame = Math.max(0, localFrame - (overlay.transitionDelay || 0) * fps);
 
-      return (
-        <Sequence key={overlay.id || index} from={from} durationInFrames={durationInFrames}>
-          <AbsoluteFill
+        // Aplicamos animationSpeed
+        const effectiveDuration = (overlay.duration || 2) * fps / (overlay.animationSpeed || 1);
+
+        // Calculamos progreso normalizado
+        let progress = Math.min(adjustedFrame / effectiveDuration, 1);
+
+        // Si hay exitEffect y estamos en los últimos frames, invertimos el progreso
+        if (overlay.exitEffect && progress > 1 - ((overlay.transitionDelay || 0) / (overlay.duration || 2))) {
+          const exitProgress = (progress - (1 - ((overlay.transitionDelay || 0) / (overlay.duration || 2)))) / ((overlay.transitionDelay || 0) / (overlay.duration || 2));
+          progress = 1 - exitProgress;
+        }
+
+        // 🎬 Determinar animación visual
+        let opacity = 1;
+        let transform = "translate(-50%, -50%)";
+
+        switch (overlay.effect) {
+          case "fadeIn":
+            opacity = interpolate(progress, [0, 1], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+            break;
+          case "zoom":
+            const scale = interpolate(progress, [0, 1], [0.8, 1.1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+            transform = `translate(-50%, -50%) scale(${scale})`;
+            break;
+          case "slideUp":
+            const y = interpolate(progress, [0, 1], [50, 0], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+            transform = `translate(-50%, calc(-50% + ${y}px))`;
+            break;
+          case "slideLeft":
+            const x = interpolate(progress, [0, 1], [100, 0], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            });
+            transform = `translate(calc(-50% + ${x}px), -50%)`;
+            break;
+        }
+
+
+        return (
+          <div
             style={{
-              justifyContent: "center",
-              alignItems: "center",
-              pointerEvents: "none",
+              position: "absolute",
+              top: overlay.positionY
+                ? `${overlay.positionY * 100}%`
+                : "50%",
+              left: overlay.positionX
+                ? `${overlay.positionX * 100}%`
+                : "50%",
+              transform,
+              color: overlay.color || "#FFFFFF",
+              fontSize: overlay.fontSize ? `${overlay.fontSize}px` : "36px",
+              backgroundColor: overlay.backgroundColor || "transparent",
+              padding: "4px 12px",
+              borderRadius: "8px",
+              textShadow: "2px 2px 8px rgba(0,0,0,0.7)",
+              opacity,
+              whiteSpace: "pre-wrap",
+              textAlign: "center",
             }}
           >
-            <div
-              style={{
-                position: "absolute",
-                top: overlay.positionY ? `${overlay.positionY * 100}%` : "50%",
-                left: overlay.positionX ? `${overlay.positionX * 100}%` : "50%",
-                transform: "translate(-50%, -50%)",
-                color: overlay.color || "#fff",
-                fontSize: overlay.fontSize ? `${overlay.fontSize}px` : "36px",
-                backgroundColor: overlay.backgroundColor || "transparent",
-                padding: "4px 12px",
-                borderRadius: "8px",
-                textAlign: "center",
-                textShadow: "2px 2px 8px rgba(0,0,0,0.7)",
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {typeof text === "string" ? text : JSON.stringify(text)}
-            </div>
-          </AbsoluteFill>
+            {
+              overlay.text && overlay.text !== "textOverlay"
+                ? overlay.text
+                : overlay.sceneEntity?.entity?.name || "Custom Text"
+            }
+          </div>
+        );
+      };
+
+      return (
+        <Sequence
+          key={overlay.id}
+          from={from}
+          durationInFrames={durationInFrames}
+        >
+          <TextOverlay />
         </Sequence>
       );
     });
   };
 
-  // 🔹 Render assets
+
+  // 🔁 Render de assets en secuencia
   let currentStartFrame = 0;
-  const renderAssets = assets.map((asset) => {
-    const durationInFrames = asset.duration! * fps;
-
-    const content =
-      asset.type === "IMAGE" ? (
-        <ImageAsset asset={asset} fps={fps} />
-      ) : asset.type === "VIDEO" ? (
-        <VideoAsset asset={asset} />
-      ) : asset.type === "ANIMATION" && asset.animationData ? (
-        <AnimationRenderer data={asset.animationData} durationInFrames={durationInFrames} />
-      ) : null;
-
-    const seq = (
-      <Sequence key={asset.id} from={currentStartFrame} durationInFrames={durationInFrames}>
-        {content}
-      </Sequence>
-    );
-
-    currentStartFrame += durationInFrames;
-    return seq;
-  });
-
-  // 🔹 Audio
-  const startFrame = Math.floor((scene.startTime ?? 0) * fps);
-  const endFrame = Math.floor((scene.endTime ?? currentStartFrame / fps) * fps);
 
   return (
-    <AbsoluteFill className="bg-black">
-      {renderAssets}
-      {renderTextOverlays()}
-      {voiceUrl && <Html5Audio src={voiceUrl} startFrom={startFrame} endAt={endFrame} />}
-    </AbsoluteFill>
+     <AbsoluteFill className="bg-black items-center justify-center">
+    {sortedAssets.map((asset) => {
+      const effectsDurations =
+        asset.effects?.length
+          ? asset.effects.map((fx) => fx.startTime + fx.duration)
+          : [];
+
+      const assetDurationSeconds =
+        asset.type === "VIDEO"
+          ? asset.duration ?? 6
+          : asset.duration ??
+            (effectsDurations.length ? Math.max(...effectsDurations) : 3);
+
+      const durationInFrames = assetDurationSeconds * fps;
+
+      const comp = (
+        <Sequence
+          key={asset.id}
+          from={currentStartFrame}
+          durationInFrames={durationInFrames}
+        >
+          {asset.type === "IMAGE" && (
+            <ImageAsset asset={asset} fps={fps} />
+          )}
+
+          {asset.type === "VIDEO" && (
+            <VideoAsset asset={asset} />
+          )}
+
+          {asset.type === "ANIMATION" && asset.animationData && (
+            <AnimationRenderer
+              data={asset.animationData}            
+              durationInFrames={durationInFrames}
+            />
+          )}
+                </Sequence>
+              );
+
+      currentStartFrame += durationInFrames;
+      return comp;
+    })}
+
+  {renderTextOverlays(fps)}
+  
+{(() => {
+  if (!voiceUrl) return null
+
+  const fps = 30
+
+  const startTime = scene.startTime ?? 0
+  const endTime = scene.endTime ?? 0
+
+  const startFrame = Math.floor(startTime * fps)
+  const endFrame = Math.floor(endTime * fps)
+  const durationFrames = endFrame - startFrame
+
+  return (
+    <Html5Audio
+      src={voiceUrl}
+      trimBefore={startFrame}
+    />
+  )
+})()}
+</AbsoluteFill>
   );
 };

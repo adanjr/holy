@@ -29,6 +29,13 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
   app.post("/renders", async (req, res) => {
     const { inputProps, videoConfig } = req.body;
 
+     console.log("📥 Received videoConfig:", videoConfig);
+      console.log("📥 Received scenes:", inputProps.scenes.map(s => ({
+        id: s.id,
+        duration: s.duration,
+        type: typeof s.duration
+      })));
+
     if (!inputProps?.scenes?.length) {
       return res.status(400).json({
         error: "inputProps.scenes is required",
