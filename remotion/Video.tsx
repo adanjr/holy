@@ -78,7 +78,7 @@ export const Video = ({
       // 🔥 FIX: Redondear para obtener frames enteros
       const durationInFrames = Math.max(
         1,
-        Math.round((scene.duration || 5) * fps)
+        Math.floor(scene.durationInFrames || 150)
       );
 
       const seq = {
@@ -331,8 +331,7 @@ export const Video = ({
             >
               <Html5Audio
                 src={track.url}
-                startFrom={Math.floor(track.trimStart * fps)}
-                endAt={Math.floor(track.trimEnd * fps)}
+                startFrom={Math.floor(track.trimStart * fps)}              
                 volume={0.2}
               />
             </Sequence>

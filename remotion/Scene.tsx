@@ -160,6 +160,7 @@ const VideoAsset = ({ asset }: { asset: SceneAsset }) => {
     <OffthreadVideo
       src={asset.storedUrl || asset.originalUrl}
       muted
+      startFrom={0}
       style={{
         width: "100%",
         height: "100%",
@@ -335,13 +336,17 @@ export const Scene = ({ scene, voiceUrl }: SceneProps) => {
           : asset.duration ??
             (effectsDurations.length ? Math.max(...effectsDurations) : 3);
 
-      const durationInFrames = assetDurationSeconds * fps;
+      const durationInFrames = Math.max(
+        1,
+        Math.floor(assetDurationSeconds * fps)
+      );
 
       const comp = (
         <Sequence
           key={asset.id}
           from={currentStartFrame}
           durationInFrames={durationInFrames}
+          layout="none"
         >
           {asset.type === "IMAGE" && (
             <ImageAsset asset={asset} fps={fps} />
@@ -365,26 +370,7 @@ export const Scene = ({ scene, voiceUrl }: SceneProps) => {
     })}
 
   {renderTextOverlays(fps)}
-  
-{(() => {
-  if (!voiceUrl) return null
-
-  const fps = 30
-
-  const startTime = scene.startTime ?? 0
-  const endTime = scene.endTime ?? 0
-
-  const startFrame = Math.floor(startTime * fps)
-  const endFrame = Math.floor(endTime * fps)
-  const durationFrames = endFrame - startFrame
-
-  return (
-    <Html5Audio
-      src={voiceUrl}
-      trimBefore={startFrame}
-    />
-  )
-})()}
+ 
 </AbsoluteFill>
   );
 };
