@@ -78,7 +78,7 @@ export const Video = ({
       // 🔥 FIX: Redondear para obtener frames enteros
       const durationInFrames = Math.max(
         1,
-        Math.floor(scene.durationInFrames || 150)
+        Math.round(scene.durationInFrames || 150)
       );
 
       const seq = {
