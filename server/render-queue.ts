@@ -91,6 +91,11 @@ export const makeRenderQueue = ({
         inputProps,
       });
 
+      composition.durationInFrames = videoConfig.durationInFrames;
+      composition.fps = videoConfig.fps;
+      composition.width = videoConfig.width;
+      composition.height = videoConfig.height;
+
       const outputPath = path.join(rendersDir, `${jobId}.mp4`);
 
       await renderMedia({

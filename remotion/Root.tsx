@@ -19,21 +19,20 @@ export const RemotionRoot: React.FC = () => {
           scenes: [],
           voiceUrl: null,
         }}
-       calculateMetadata={({ props }) => {
-        const fps = 30;
-        const scenes = props.scenes ?? [];
+        calculateMetadata={({ props }) => {
+          const scenes = props.scenes ?? [];
 
-        const durationInFrames = scenes.reduce(
-          (acc: number, scene: any) =>
-            acc + (scene.duration || 5) * fps,
-          0
-        );
+          const durationInFrames = Math.max(
+            1,
+            scenes.reduce(
+              (acc: number, scene: any) =>
+                acc + (scene.durationInFrames || 150), // ✅ usa el que mandas
+              0
+            )
+          );
 
-        return {
-          durationInFrames,
-          fps,
-        };
-      }}
+          return { durationInFrames, fps: 30 };
+        }}
       />
     </>
   );
