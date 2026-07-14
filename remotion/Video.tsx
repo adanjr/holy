@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { useCurrentFrame } from "remotion";
-import { AbsoluteFill, Sequence, Html5Audio } from "remotion";
+import { AbsoluteFill, Sequence, Html5Audio, useCurrentFrame, useVideoConfig } from "remotion";
 import { Scene } from "./Scene";
 
 type SubtitlesStyle = {
@@ -61,40 +60,44 @@ export const Video = ({
   subtitlesEnabled = false,
   subtitlesStyle = {},
 }: FinalCompositionProps) => {
-  const fps = 30;
-
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   if (!scenes?.length) return null;
 
   /**
    * Calculamos posiciones y duración total SOLO una vez
    * → evita glitches y mantiene animaciones suaves
+   *
+   * IMPORTANTE: cada escena se ancla a su startTime/endTime ABSOLUTO
+   * (en segundos, calculado por tts-split/process-audio a partir de los
+   * bookmarks de Azure). NO encadenamos duraciones una tras otra, porque
+   * el audio real (voiceUrl) incluye silencios/pausas entre escenas que
+   * un acumulador secuencial ignora — eso es lo que causaba el
+   * desfase progresivo entre imagen y audio.
    */
   const { sequences, totalDuration } = useMemo(() => {
-    let currentStartFrame = 0;
-
     const sequences = scenes.map((scene, index) => {
-      // 🔥 FIX: Redondear para obtener frames enteros
-      const durationInFrames = Math.max(
-        1,
-        Math.round(scene.durationInFrames || 150)
-      );
+      const start = scene.startTime ?? 0;
+      const end = scene.endTime ?? start + (scene.duration || 5);
 
-      const seq = {
+      const from = Math.round(start * fps);
+      const durationInFrames = Math.max(1, Math.round((end - start) * fps));
+
+      return {
         id: scene.id || index,
-        from: currentStartFrame,
+        from,
         durationInFrames,
         scene,
       };
-
-      currentStartFrame += durationInFrames;
-
-      return seq;
     });
 
-    return { sequences, totalDuration: currentStartFrame };
-  }, [scenes, fps]); // 🔥 Agregar fps a dependencias
+    const totalDuration = sequences.length
+      ? Math.max(...sequences.map((s) => s.from + s.durationInFrames))
+      : 0;
+
+    return { sequences, totalDuration };
+  }, [scenes, fps]);
 
   const getSubtitlePosition = () => {
     switch (subtitlesStyle.position) {
@@ -116,7 +119,7 @@ export const Video = ({
   };
 
   const getPositionStyle = (position?: string) => {
-    const margin = 40;
+    const margin = 40; // 🔥 SAFE MARGIN (esto arregla el corte)
 
     switch (position) {
       case "top-left":
@@ -143,9 +146,11 @@ export const Video = ({
     }
   };
 
+  const positionStyle = getPositionStyle();
+
   return (
     <AbsoluteFill className="bg-black">
-      {/* 🎬 Escenas encadenadas */}
+      {/* 🎬 Escenas ancladas a tiempo absoluto */}
       {sequences.map(({ id, from, durationInFrames, scene }) => (
         <Sequence key={id} from={from} durationInFrames={durationInFrames}>
           <Scene scene={scene} />
@@ -156,7 +161,6 @@ export const Video = ({
         <AbsoluteFill style={{ pointerEvents: "none" }}>
           <img
             src={watermark.url}
-            alt="watermark"
             style={{
               position: "absolute",
               top: "50%",
@@ -191,7 +195,6 @@ export const Video = ({
               >
                 <img
                   src={watermark.url}
-                  alt={`watermark-tile-${i}`}
                   style={{
                     width: `${watermark.size || 20}%`,
                     opacity: watermark.opacity ?? 0.1,
@@ -208,7 +211,6 @@ export const Video = ({
         <AbsoluteFill style={{ pointerEvents: "none" }}>
           <img
             src={logo.url}
-            alt="logo"
             style={{
               position: "absolute",
               ...getPositionStyle(logo.position),
@@ -219,99 +221,103 @@ export const Video = ({
         </AbsoluteFill>
       )}
 
-      {/* 🎧 Audio sincronizado */}
-      {voiceUrl && <Html5Audio src={voiceUrl} />}
+      {/* 🎧 Audio: un solo archivo continuo, ya en tiempo absoluto real */}
+      {voiceUrl && (
+        <Sequence from={0}>
+          <Html5Audio src={voiceUrl} />
+        </Sequence>
+      )}
 
       {/* 📝 Subtítulos */}
-      {subtitles.map((sub, index) => {
-        const startFrame = Math.floor((sub.startTime ?? sub.start ?? 0) * fps);
-        const end = sub.endTime ?? sub.end ?? 0;
+      {subtitlesEnabled &&
+        subtitles.map((sub, index) => {
+          const startFrame = Math.floor((sub.startTime ?? sub.start ?? 0) * fps);
+          const end = sub.endTime ?? sub.end ?? 0;
 
-        const durationInFrames = Math.max(
-          1,
-          Math.floor((end - (sub.startTime ?? sub.start ?? 0)) * fps)
-        );
+          const durationInFrames = Math.max(
+            1,
+            Math.floor((end - (sub.startTime ?? sub.start ?? 0)) * fps)
+          );
 
-        const words = sub.text.split(" ");
+          const words = sub.text.split(" ");
 
-        const progress = (frame - startFrame) / durationInFrames;
+          const progress = (frame - startFrame) / durationInFrames;
 
-        const safeProgress = Math.min(1, Math.max(0, progress));
+          const safeProgress = Math.min(1, Math.max(0, progress));
 
-        const activeWordIndex = Math.floor(safeProgress * (words.length - 1));
+          const activeWordIndex = Math.floor(safeProgress * (words.length - 1));
 
-        return (
-          <Sequence
-            key={`subtitle-${sub.id || index}`}
-            from={startFrame}
-            durationInFrames={durationInFrames}
-          >
-            <AbsoluteFill
-              style={{
-                alignItems: "center",
-                pointerEvents: "none",
-                ...getSubtitlePosition(),
-              }}
+          return (
+            <Sequence
+              key={`subtitle-${sub.id || index}`}
+              from={startFrame}
+              durationInFrames={durationInFrames}
             >
-              <div
+              <AbsoluteFill
                 style={{
-                  backgroundColor:
-                    subtitlesStyle.mode === "tiktok"
-                      ? "transparent"
-                      : subtitlesStyle.background ?? "rgba(0,0,0,0.6)",
-                  color: subtitlesStyle.color ?? "#ffffff",
-                  padding: "12px 20px",
-                  borderRadius: 12,
-                  fontSize: subtitlesStyle.fontSize ?? 42,
-                  fontWeight: "bold",
-                  textAlign: "center",
-                  maxWidth: "80%",
+                  alignItems: "center",
+                  pointerEvents: "none",
+                  ...getSubtitlePosition(),
                 }}
               >
-                {subtitlesStyle.mode === "tiktok" ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      justifyContent: "center",
-                      gap: 6,
-                    }}
-                  >
-                    {words.map((word, i) => {
-                      const isActive =
-                        subtitlesStyle.mode === "tiktok" &&
-                        i === activeWordIndex;
+                <div
+                  style={{
+                    backgroundColor:
+                      subtitlesStyle.mode === "tiktok"
+                        ? "transparent"
+                        : subtitlesStyle.background ?? "rgba(0,0,0,0.6)",
+                    color: subtitlesStyle.color ?? "#ffffff",
+                    padding: "12px 20px",
+                    borderRadius: 12,
+                    fontSize: subtitlesStyle.fontSize ?? 42,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    maxWidth: "80%",
+                  }}
+                >
+                  {subtitlesStyle.mode === "tiktok" ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {words.map((word, i) => {
+                        const isActive =
+                          subtitlesStyle.mode === "tiktok" && i === activeWordIndex;
 
-                      return (
-                        <span
-                          key={i}
-                          style={{
-                            color: isActive
-                              ? subtitlesStyle.highlightColor || "#00ffcc"
-                              : subtitlesStyle.color || "#ffffff",
+                        return (
+                          <span
+                            key={i}
+                            style={{
+                              color: isActive
+                                ? subtitlesStyle.highlightColor || "#00ffcc"
+                                : subtitlesStyle.color || "#ffffff",
 
-                            textShadow: "0px 0px 12px rgba(0,0,0,0.9)",
+                              textShadow: "0px 0px 12px rgba(0,0,0,0.9)",
 
-                            transform: isActive ? "scale(1.15)" : "scale(1)",
+                              transform: isActive ? "scale(1.15)" : "scale(1)",
 
-                            transition: "all 0.15s ease",
+                              transition: "all 0.15s ease",
 
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {word}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  sub.text
-                )}
-              </div>
-            </AbsoluteFill>
-          </Sequence>
-        );
-      })}
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {word}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    sub.text
+                  )}
+                </div>
+              </AbsoluteFill>
+            </Sequence>
+          );
+        })}
 
       {/* 🎵 Music Tracks */}
       {musicTracks
@@ -324,15 +330,12 @@ export const Video = ({
           );
 
           return (
-            <Sequence
-              key={track.id}
-              from={from}
-              durationInFrames={durationInFrames}
-            >
+            <Sequence key={track.id} from={from} durationInFrames={durationInFrames}>
               <Html5Audio
                 src={track.url}
-                startFrom={Math.floor(track.trimStart * fps)}              
-                volume={0.2}
+                startFrom={Math.floor(track.trimStart * fps)}
+                endAt={Math.floor(track.trimEnd * fps)}
+                volume={0.2} // puedes hacerlo dinámico luego
               />
             </Sequence>
           );

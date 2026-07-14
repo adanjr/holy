@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame,Img, Html5Video, OffthreadVideo, Html5Audio  } from "remotion";
 import { interpolate, Easing } from "remotion";
-import { AnimationRenderer } from "./animations/AnimationRenderer";  
+import { AnimationRenderer } from "@/components/remotion/animations/AnimationRenderer"
 
 export type SceneModel = {
   id: string
@@ -164,7 +164,7 @@ const VideoAsset = ({ asset }: { asset: SceneAsset }) => {
       style={{
         width: "100%",
         height: "100%",
-        objectFit: "contain",
+        objectFit: "cover",
       }}
     />
   );
@@ -336,10 +336,7 @@ export const Scene = ({ scene, voiceUrl }: SceneProps) => {
           : asset.duration ??
             (effectsDurations.length ? Math.max(...effectsDurations) : 3);
 
-      const durationInFrames = Math.max(
-        1,
-        Math.floor(assetDurationSeconds * fps)
-      );
+      const durationInFrames = Math.floor(assetDurationSeconds * fps);
 
       const comp = (
         <Sequence
@@ -370,7 +367,26 @@ export const Scene = ({ scene, voiceUrl }: SceneProps) => {
     })}
 
   {renderTextOverlays(fps)}
- 
+  
+{(() => {
+  if (!voiceUrl) return null
+
+  const fps = 30
+
+  const startTime = scene.startTime ?? 0
+  const endTime = scene.endTime ?? 0
+
+  const startFrame = Math.floor(startTime * fps)
+  const endFrame = Math.floor(endTime * fps)
+  const durationFrames = endFrame - startFrame
+
+  return (
+    <Html5Audio
+      src={voiceUrl}
+      trimBefore={startFrame}
+    />
+  )
+})()}
 </AbsoluteFill>
   );
 };
