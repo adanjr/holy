@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame,Img, Html5Video, OffthreadVideo, Html5Audio  } from "remotion";
 import { interpolate, Easing } from "remotion";
-import { AnimationRenderer } from "@/components/remotion/animations/AnimationRenderer"
+import { AnimationRenderer } from "./animations/AnimationRenderer"
 
 export type SceneModel = {
   id: string
