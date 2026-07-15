@@ -70,31 +70,42 @@ export const Video = ({
   /**
    * Calculamos posiciones y duración total SOLO una vez
    * → evita glitches y mantiene animaciones suaves
+   *
+   * 🔥 FIX: antes se usaba `scene.durationInFrames` (que las escenas que
+   * llegan desde el storyboard NUNCA tienen — solo tienen startTime/endTime
+   * en segundos), así que siempre caía al fallback de 150 frames (5s) para
+   * TODAS las escenas, sin importar su narración real. Ahora anclamos cada
+   * escena a su startTime/endTime absoluto (igual que en el Video.tsx del
+   * preview), y extendemos la parte VISUAL hasta que arranca la siguiente
+   * escena, para no dejar un hueco negro durante el silencio real entre
+   * narraciones. El audio no se toca por esto — sigue siendo un único
+   * archivo continuo reproducido tal cual más abajo.
    */
   const { sequences, totalDuration } = useMemo(() => {
-    let currentStartFrame = 0;
-
     const sequences = scenes.map((scene, index) => {
-      // 🔥 FIX: Redondear para obtener frames enteros
-      const durationInFrames = Math.max(
-        1,
-        Math.round(scene.durationInFrames || 150)
-      );
+      const start = scene.startTime ?? 0;
+      const ownEnd = scene.endTime ?? start + (scene.duration || 5);
 
-      const seq = {
+      const nextScene = scenes[index + 1];
+      const visualEnd = nextScene ? (nextScene.startTime ?? ownEnd) : ownEnd;
+
+      const from = Math.round(start * fps);
+      const durationInFrames = Math.max(1, Math.round((visualEnd - start) * fps));
+
+      return {
         id: scene.id || index,
-        from: currentStartFrame,
+        from,
         durationInFrames,
         scene,
       };
-
-      currentStartFrame += durationInFrames;
-
-      return seq;
     });
 
-    return { sequences, totalDuration: currentStartFrame };
-  }, [scenes, fps]); // 🔥 Agregar fps a dependencias
+    const totalDuration = sequences.length
+      ? Math.max(...sequences.map((s) => s.from + s.durationInFrames))
+      : 0;
+
+    return { sequences, totalDuration };
+  }, [scenes, fps]);
 
   const getSubtitlePosition = () => {
     switch (subtitlesStyle.position) {
@@ -145,10 +156,10 @@ export const Video = ({
 
   return (
     <AbsoluteFill className="bg-black">
-      {/* 🎬 Escenas encadenadas */}
+      {/* 🎬 Escenas ancladas a tiempo absoluto */}
       {sequences.map(({ id, from, durationInFrames, scene }) => (
         <Sequence key={id} from={from} durationInFrames={durationInFrames}>
-          <Scene scene={scene} />
+          <Scene scene={scene} durationInFrames={durationInFrames} />
         </Sequence>
       ))}
 
@@ -219,7 +230,7 @@ export const Video = ({
         </AbsoluteFill>
       )}
 
-      {/* 🎧 Audio sincronizado */}
+      {/* 🎧 Audio sincronizado: archivo único, ya en tiempo absoluto real */}
       {voiceUrl && <Html5Audio src={voiceUrl} />}
 
       {/* 📝 Subtítulos */}
@@ -331,7 +342,8 @@ export const Video = ({
             >
               <Html5Audio
                 src={track.url}
-                startFrom={Math.floor(track.trimStart * fps)}              
+                startFrom={Math.floor(track.trimStart * fps)}
+                endAt={Math.floor(track.trimEnd * fps)}
                 volume={0.2}
               />
             </Sequence>

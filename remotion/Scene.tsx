@@ -22,6 +22,11 @@ export type SceneModel = {
 type SceneProps = {
   scene: SceneModel
   voiceUrl?: string | null
+  // Duración total (en frames) que esta escena debe llenar visualmente.
+  // Video.tsx la extiende más allá del endTime propio de la narración para
+  // tapar el silencio hasta que arranca la siguiente escena. Si no se
+  // pasa, se usa la duración natural de los assets.
+  durationInFrames?: number
 }
 
 type SceneEffect = {
@@ -171,7 +176,7 @@ const VideoAsset = ({ asset }: { asset: SceneAsset }) => {
 };
 
 
-export const Scene = ({ scene, voiceUrl }: SceneProps) => {
+export const Scene = ({ scene, voiceUrl, durationInFrames: totalDurationOverride }: SceneProps) => {
   //const audioRef = useRef<HTMLAudioElement>(null);
   const fps = 30;
 
@@ -318,13 +323,19 @@ export const Scene = ({ scene, voiceUrl }: SceneProps) => {
     });
   };
 
-
-  // 🔁 Render de assets en secuencia
-  let currentStartFrame = 0;
-
-  return (
-     <AbsoluteFill className="bg-black items-center justify-center">
-    {sortedAssets.map((asset) => {
+  // 🔁 Precalculamos la duración (en frames) de cada asset ANTES de
+  // renderizar. Si el contenedor (Video.tsx) pidió más tiempo del que
+  // suman naturalmente los assets — porque extendió la escena para tapar
+  // el silencio hasta la siguiente — le sumamos ese sobrante al ÚLTIMO
+  // asset en vez de dejarlo en negro.
+  //
+  // IMPORTANTE: si ese último asset tiene efectos (zoom/pan), no alcanza
+  // con alargar su Sequence — el efecto tiene su propia duración fija y
+  // "interpolate" clampea al valor final apenas esa duración se cumple,
+  // dejando la imagen congelada el resto del tiempo. Por eso acá también
+  // RE-ESCALAMOS el efecto en la misma proporción que se estiró el asset.
+  const { assetDurations, assetEffectsOverride } = useMemo(() => {
+    const durations = sortedAssets.map((asset) => {
       const effectsDurations =
         asset.effects?.length
           ? asset.effects.map((fx) => fx.startTime + fx.duration)
@@ -336,10 +347,47 @@ export const Scene = ({ scene, voiceUrl }: SceneProps) => {
           : asset.duration ??
             (effectsDurations.length ? Math.max(...effectsDurations) : 3);
 
-      const durationInFrames = Math.max(
-        1,
-        Math.floor(assetDurationSeconds * fps)
-      );
+      return Math.max(1, Math.floor(assetDurationSeconds * fps));
+    });
+
+    const effectsOverride: (SceneEffect[] | undefined)[] = sortedAssets.map(() => undefined);
+
+    if (totalDurationOverride != null && durations.length) {
+      const sum = durations.reduce((a, b) => a + b, 0);
+      const remainder = totalDurationOverride - sum;
+
+      if (remainder > 0) {
+        const lastIndex = durations.length - 1;
+        const originalLastDuration = durations[lastIndex];
+        const extendedLastDuration = originalLastDuration + remainder;
+
+        durations[lastIndex] = extendedLastDuration;
+
+        const lastAsset = sortedAssets[lastIndex];
+        if (lastAsset.effects?.length && originalLastDuration > 0) {
+          const ratio = extendedLastDuration / originalLastDuration;
+          effectsOverride[lastIndex] = lastAsset.effects.map((fx) => ({
+            ...fx,
+            startTime: fx.startTime * ratio,
+            duration: fx.duration * ratio,
+          }));
+        }
+      }
+    }
+
+    return { assetDurations: durations, assetEffectsOverride: effectsOverride };
+  }, [sortedAssets, totalDurationOverride, fps]);
+
+  // 🔁 Render de assets en secuencia
+  let currentStartFrame = 0;
+
+  return (
+     <AbsoluteFill className="bg-black items-center justify-center">
+    {sortedAssets.map((asset, assetIndex) => {
+      const durationInFrames = assetDurations[assetIndex];
+      const effectiveAsset = assetEffectsOverride[assetIndex]
+        ? { ...asset, effects: assetEffectsOverride[assetIndex] }
+        : asset;
 
       const comp = (
         <Sequence
@@ -349,7 +397,7 @@ export const Scene = ({ scene, voiceUrl }: SceneProps) => {
           layout="none"
         >
           {asset.type === "IMAGE" && (
-            <ImageAsset asset={asset} fps={fps} />
+            <ImageAsset asset={effectiveAsset} fps={fps} />
           )}
 
           {asset.type === "VIDEO" && (
