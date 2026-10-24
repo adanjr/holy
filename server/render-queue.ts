@@ -48,6 +48,21 @@ type JobState =
 
 const compositionId = "Video";
 
+const getRenderEnvVariables = () => {
+  const envVariables: Record<string, string> = {};
+
+  if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+    envVariables.NEXT_PUBLIC_MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  }
+
+  if (process.env.NEXT_PUBLIC_STADIA_MAPS_API_KEY) {
+    envVariables.NEXT_PUBLIC_STADIA_MAPS_API_KEY =
+      process.env.NEXT_PUBLIC_STADIA_MAPS_API_KEY;
+  }
+
+  return envVariables;
+};
+
 export const makeRenderQueue = ({
   port,
   serveUrl,
@@ -85,10 +100,13 @@ export const makeRenderQueue = ({
         durationInFrames: 300, // fallback seguro
       };
 
+      const envVariables = getRenderEnvVariables();
+
       const composition = await selectComposition({
         serveUrl,
         id: compositionId,
         inputProps,
+        envVariables,
       });
 
       composition.durationInFrames = videoConfig.durationInFrames;
@@ -104,6 +122,7 @@ export const makeRenderQueue = ({
         browserExecutable: null,
         composition,
         inputProps,
+        envVariables,
         codec: "h264",       
 
         onProgress: (progress) => {
