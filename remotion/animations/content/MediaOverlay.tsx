@@ -47,7 +47,7 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
   const opacity = interpolate(progress, [0, 1], [0, 1])
 
   /* ----------------------------- */
-  /* Texto animación */
+  /* Texto animaciÃ³n */
   /* ----------------------------- */
 
   const textOpacity = interpolate(frame, [15, 40], [0, 1])
@@ -61,7 +61,7 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: "#000",
+        backgroundColor: theme.backgroundColor || "#000",
         justifyContent: "center",
         alignItems: "center",
         overflow: "hidden"
@@ -98,8 +98,7 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
         style={{
           position: "absolute",
           inset: 0,
-          background:
-            "linear-gradient(to top, rgba(0,0,0,0.75), transparent 60%)"
+          background: `linear-gradient(to top, ${theme.backgroundColor || "#000"}F2, transparent 68%)`
         }}
       />
 
@@ -110,7 +109,7 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
           bottom: 80,
           left: 80,
           right: 80,
-          color: "#fff",
+          color: theme.textColor || "#fff",
           fontFamily: theme.fontFamily,
           transform: `translateY(${textY}px)`,
           opacity: textOpacity
@@ -122,7 +121,9 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
             style={{
               fontSize: 52,
               fontWeight: 700,
-              marginBottom: 20
+              marginBottom: 20,
+              borderLeft: `10px solid ${theme.primaryColor}`,
+              paddingLeft: 22
             }}
           >
             {data.headline}

@@ -36,7 +36,7 @@ export const MultiPanel: React.FC<MultiPanelProps> = ({
   const items = data.items || []
 
   /* ----------------------------- */
-  /* Animación */
+  /* AnimaciÃ³n */
   /* ----------------------------- */
 
   const progress = spring({
@@ -68,7 +68,7 @@ export const MultiPanel: React.FC<MultiPanelProps> = ({
   /* ----------------------------- */
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000" }}>
+    <AbsoluteFill style={{ backgroundColor: theme.backgroundColor || "#000" }}>
 
       {/* Panels */}
       <div style={{ ...containerStyle, width: "100%", height: "100%" }}>
@@ -118,8 +118,7 @@ export const MultiPanel: React.FC<MultiPanelProps> = ({
         style={{
           position: "absolute",
           inset: 0,
-          background:
-            "linear-gradient(to top, rgba(0,0,0,0.7), transparent 60%)"
+          background: `linear-gradient(to top, ${theme.backgroundColor || "#000"}E6, transparent 65%)`
         }}
       />
 
@@ -132,11 +131,13 @@ export const MultiPanel: React.FC<MultiPanelProps> = ({
             left: 80,
             right: 80,
             textAlign: "center",
-            color: "#fff",
+            color: theme.textColor || "#fff",
             fontSize: 48,
             fontWeight: 700,
             fontFamily: theme.fontFamily,
-            opacity
+            opacity,
+            borderBottom: `8px solid ${theme.primaryColor}`,
+            paddingBottom: 16
           }}
         >
           {title}

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { useCurrentFrame } from "remotion";
-import { AbsoluteFill, Sequence, Html5Audio } from "remotion";
+import { AbsoluteFill, Sequence, Html5Audio, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Scene } from "./Scene";
+import { getActiveWordIndex, splitSubtitleWords } from "../lib/subtitles/word-highlighting";
 
 type SubtitlesStyle = {
   fontSize?: number;
@@ -21,8 +21,9 @@ type MusicTrack = {
   endTime: number;
   trimStart: number;
   trimEnd: number;
-  duration: number;
+  duration: number | null;
   order: number;
+  volume?: number;
 };
 
 type WaterMark = {
@@ -49,6 +50,34 @@ type FinalCompositionProps = {
   subtitles?: any[];
   subtitlesEnabled?: boolean;
   subtitlesStyle?: SubtitlesStyle;
+  sceneTransition?: "NONE" | "FADE" | "SLIDE_LEFT" | "SLIDE_UP" | "ZOOM" | "ZOOM_OUT" | "BLUR";
+  sceneTransitionDuration?: number;
+};
+
+const SceneVisualTransition = ({ type, durationSeconds, durationInFrames, children }: {
+  type: NonNullable<FinalCompositionProps["sceneTransition"]>;
+  durationSeconds: number;
+  durationInFrames: number;
+  children: React.ReactNode;
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  if (type === "NONE") return <>{children}</>;
+
+  const transitionFrames = Math.max(1, Math.min(Math.round(durationSeconds * fps), Math.floor(durationInFrames / 2)));
+  const progress = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const transform = type === "SLIDE_LEFT"
+    ? `translateX(${interpolate(progress, [0, 1], [6, 0])}%)`
+    : type === "SLIDE_UP"
+      ? `translateY(${interpolate(progress, [0, 1], [6, 0])}%)`
+      : type === "ZOOM"
+        ? `scale(${interpolate(progress, [0, 1], [0.96, 1])})`
+        : type === "ZOOM_OUT"
+          ? `scale(${interpolate(progress, [0, 1], [1.06, 1])})`
+          : undefined;
+  const filter = type === "BLUR" ? `blur(${interpolate(progress, [0, 1], [18, 0])}px)` : undefined;
+
+  return <AbsoluteFill style={{ opacity: progress, transform, filter, transformOrigin: "center center" }}>{children}</AbsoluteFill>;
 };
 
 export const Video = ({
@@ -60,28 +89,30 @@ export const Video = ({
   subtitles = [],
   subtitlesEnabled = false,
   subtitlesStyle = {},
+  sceneTransition = "NONE",
+  sceneTransitionDuration = 0.3,
 }: FinalCompositionProps) => {
-  const fps = 30;
-
   const frame = useCurrentFrame();
-
-  if (!scenes?.length) return null;
+  const { fps } = useVideoConfig();
 
   /**
    * Calculamos posiciones y duración total SOLO una vez
    * → evita glitches y mantiene animaciones suaves
    *
-   * 🔥 FIX: antes se usaba `scene.durationInFrames` (que las escenas que
-   * llegan desde el storyboard NUNCA tienen — solo tienen startTime/endTime
-   * en segundos), así que siempre caía al fallback de 150 frames (5s) para
-   * TODAS las escenas, sin importar su narración real. Ahora anclamos cada
-   * escena a su startTime/endTime absoluto (igual que en el Video.tsx del
-   * preview), y extendemos la parte VISUAL hasta que arranca la siguiente
-   * escena, para no dejar un hueco negro durante el silencio real entre
-   * narraciones. El audio no se toca por esto — sigue siendo un único
-   * archivo continuo reproducido tal cual más abajo.
+   * IMPORTANTE: cada escena se ancla a su startTime/endTime ABSOLUTO
+   * (en segundos, calculado por tts-split/process-audio a partir de los
+   * bookmarks de Azure). NO encadenamos duraciones una tras otra, porque
+   * el audio real (voiceUrl) incluye silencios/pausas entre escenas que
+   * un acumulador secuencial ignora — eso es lo que causaba el
+   * desfase progresivo entre imagen y audio.
+   *
+   * 🔥 Además, la parte VISUAL de cada escena se sostiene hasta que arranca
+   * la próxima (no hasta su propio endTime), para no dejar un hueco negro
+   * durante el silencio real que hay entre narraciones. El audio no se ve
+   * afectado por esto — cada escena sigue sonando exactamente en su
+   * startTime/endTime real (eso lo maneja Scene.tsx con trimBefore/trimAfter).
    */
-  const { sequences, totalDuration } = useMemo(() => {
+  const sequences = useMemo(() => {
     const sequences = scenes.map((scene, index) => {
       const start = scene.startTime ?? 0;
       const ownEnd = scene.endTime ?? start + (scene.duration || 5);
@@ -100,12 +131,10 @@ export const Video = ({
       };
     });
 
-    const totalDuration = sequences.length
-      ? Math.max(...sequences.map((s) => s.from + s.durationInFrames))
-      : 0;
-
-    return { sequences, totalDuration };
+    return sequences;
   }, [scenes, fps]);
+
+  if (!scenes?.length) return null;
 
   const getSubtitlePosition = () => {
     switch (subtitlesStyle.position) {
@@ -127,7 +156,7 @@ export const Video = ({
   };
 
   const getPositionStyle = (position?: string) => {
-    const margin = 40;
+    const margin = 40; // 🔥 SAFE MARGIN (esto arregla el corte)
 
     switch (position) {
       case "top-left":
@@ -156,10 +185,12 @@ export const Video = ({
 
   return (
     <AbsoluteFill className="bg-black">
-      {/* 🎬 Escenas ancladas a tiempo absoluto */}
-      {sequences.map(({ id, from, durationInFrames, scene }) => (
+      {/* 🎬 Escenas ancladas a tiempo absoluto, visual extendido hasta la siguiente */}
+      {sequences.map(({ id, from, durationInFrames, scene }, index) => (
         <Sequence key={id} from={from} durationInFrames={durationInFrames}>
-          <Scene scene={scene} durationInFrames={durationInFrames} />
+          <SceneVisualTransition type={index === 0 ? "NONE" : sceneTransition} durationSeconds={sceneTransitionDuration} durationInFrames={durationInFrames}>
+            <Scene scene={scene} durationInFrames={durationInFrames} />
+          </SceneVisualTransition>
         </Sequence>
       ))}
 
@@ -167,7 +198,6 @@ export const Video = ({
         <AbsoluteFill style={{ pointerEvents: "none" }}>
           <img
             src={watermark.url}
-            alt="watermark"
             style={{
               position: "absolute",
               top: "50%",
@@ -202,7 +232,6 @@ export const Video = ({
               >
                 <img
                   src={watermark.url}
-                  alt={`watermark-tile-${i}`}
                   style={{
                     width: `${watermark.size || 20}%`,
                     opacity: watermark.opacity ?? 0.1,
@@ -219,7 +248,6 @@ export const Video = ({
         <AbsoluteFill style={{ pointerEvents: "none" }}>
           <img
             src={logo.url}
-            alt="logo"
             style={{
               position: "absolute",
               ...getPositionStyle(logo.position),
@@ -230,102 +258,106 @@ export const Video = ({
         </AbsoluteFill>
       )}
 
-      {/* 🎧 Audio sincronizado: archivo único, ya en tiempo absoluto real */}
-      {voiceUrl && <Html5Audio src={voiceUrl} />}
+      {/* 🎧 Audio: un solo archivo continuo, ya en tiempo absoluto real */}
+      {voiceUrl && (
+        <Sequence from={0}>
+          <Html5Audio src={voiceUrl} />
+        </Sequence>
+      )}
 
       {/* 📝 Subtítulos */}
-      {subtitles.map((sub, index) => {
-        const startFrame = Math.floor((sub.startTime ?? sub.start ?? 0) * fps);
-        const end = sub.endTime ?? sub.end ?? 0;
+      {subtitlesEnabled &&
+        subtitles.map((sub, index) => {
+          const startFrame = Math.floor((sub.startTime ?? sub.start ?? 0) * fps);
+          const end = sub.endTime ?? sub.end ?? 0;
 
-        const durationInFrames = Math.max(
-          1,
-          Math.floor((end - (sub.startTime ?? sub.start ?? 0)) * fps)
-        );
+          const durationInFrames = Math.max(
+            1,
+            Math.floor((end - (sub.startTime ?? sub.start ?? 0)) * fps)
+          );
 
-        const words = sub.text.split(" ");
+          const words = splitSubtitleWords(sub.text);
 
-        const progress = (frame - startFrame) / durationInFrames;
+          const progress = (frame - startFrame) / durationInFrames;
 
-        const safeProgress = Math.min(1, Math.max(0, progress));
+          const safeProgress = Math.min(1, Math.max(0, progress));
 
-        const activeWordIndex = Math.floor(safeProgress * (words.length - 1));
+          const activeWordIndex = getActiveWordIndex(words, safeProgress);
 
-        return (
-          <Sequence
-            key={`subtitle-${sub.id || index}`}
-            from={startFrame}
-            durationInFrames={durationInFrames}
-          >
-            <AbsoluteFill
-              style={{
-                alignItems: "center",
-                pointerEvents: "none",
-                ...getSubtitlePosition(),
-              }}
+          return (
+            <Sequence
+              key={`subtitle-${sub.id || index}`}
+              from={startFrame}
+              durationInFrames={durationInFrames}
             >
-              <div
+              <AbsoluteFill
                 style={{
-                  backgroundColor:
-                    subtitlesStyle.mode === "tiktok"
-                      ? "transparent"
-                      : subtitlesStyle.background ?? "rgba(0,0,0,0.6)",
-                  color: subtitlesStyle.color ?? "#ffffff",
-                  padding: "12px 20px",
-                  borderRadius: 12,
-                  fontSize: subtitlesStyle.fontSize ?? 42,
-                  fontWeight: "bold",
-                  textAlign: "center",
-                  maxWidth: "80%",
+                  alignItems: "center",
+                  pointerEvents: "none",
+                  ...getSubtitlePosition(),
                 }}
               >
-                {subtitlesStyle.mode === "tiktok" ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      justifyContent: "center",
-                      gap: 6,
-                    }}
-                  >
-                    {words.map((word, i) => {
-                      const isActive =
-                        subtitlesStyle.mode === "tiktok" &&
-                        i === activeWordIndex;
+                <div
+                  style={{
+                    backgroundColor:
+                      subtitlesStyle.mode === "tiktok"
+                        ? "transparent"
+                        : subtitlesStyle.background ?? "rgba(0,0,0,0.6)",
+                    color: subtitlesStyle.color ?? "#ffffff",
+                    padding: "12px 20px",
+                    borderRadius: 12,
+                    fontSize: subtitlesStyle.fontSize ?? 42,
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    maxWidth: "80%",
+                  }}
+                >
+                  {subtitlesStyle.mode === "tiktok" ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {words.map((word, i) => {
+                        const isActive =
+                          subtitlesStyle.mode === "tiktok" && i === activeWordIndex;
 
-                      return (
-                        <span
-                          key={i}
-                          style={{
-                            color: isActive
-                              ? subtitlesStyle.highlightColor || "#00ffcc"
-                              : subtitlesStyle.color || "#ffffff",
+                        return (
+                          <span
+                            key={i}
+                            style={{
+                              color: isActive
+                                ? subtitlesStyle.highlightColor || "#00ffcc"
+                                : subtitlesStyle.color || "#ffffff",
 
-                            textShadow: "0px 0px 12px rgba(0,0,0,0.9)",
+                              textShadow: "0px 0px 12px rgba(0,0,0,0.9)",
 
-                            transform: isActive ? "scale(1.15)" : "scale(1)",
+                              transform: isActive ? "scale(1.15)" : "scale(1)",
 
-                            transition: "all 0.15s ease",
+                              transition: "all 0.15s ease",
 
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {word}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  sub.text
-                )}
-              </div>
-            </AbsoluteFill>
-          </Sequence>
-        );
-      })}
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {word}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    sub.text
+                  )}
+                </div>
+              </AbsoluteFill>
+            </Sequence>
+          );
+        })}
 
       {/* 🎵 Music Tracks */}
-      {musicTracks
+      {[...musicTracks]
         .sort((a, b) => a.order - b.order)
         .map((track) => {
           const from = Math.floor(track.startTime * fps);
@@ -335,16 +367,12 @@ export const Video = ({
           );
 
           return (
-            <Sequence
-              key={track.id}
-              from={from}
-              durationInFrames={durationInFrames}
-            >
+            <Sequence key={track.id} from={from} durationInFrames={durationInFrames}>
               <Html5Audio
                 src={track.url}
                 startFrom={Math.floor(track.trimStart * fps)}
                 endAt={Math.floor(track.trimEnd * fps)}
-                volume={0.2}
+                volume={Math.min(1, Math.max(0, track.volume ?? 0.2))}
               />
             </Sequence>
           );

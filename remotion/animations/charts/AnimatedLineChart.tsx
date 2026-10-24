@@ -45,7 +45,19 @@ export const AnimatedLineChart: React.FC<AnimatedLineChartProps> = ({
   const innerWidth = chartWidth - marginLeft - marginRight
   const innerHeight = chartHeight - marginTop - marginBottom
 
-  const stepX = innerWidth / (data.values.length - 1)
+  const stepX = data.values.length > 1
+    ? innerWidth / (data.values.length - 1)
+    : 0
+
+  const points = data.values.map((value, i) => ({
+    x: i * stepX,
+    y: innerHeight - (value / maxValue) * innerHeight,
+  }))
+
+  const pathLength = points.slice(1).reduce((length, point, i) => {
+    const previous = points[i]
+    return length + Math.hypot(point.x - previous.x, point.y - previous.y)
+  }, 0)
 
   const formatNumber = (num: number) =>
     num.toLocaleString("en-US")
@@ -64,6 +76,10 @@ export const AnimatedLineChart: React.FC<AnimatedLineChartProps> = ({
     frame,
     fps,
     config: { damping: 100 },
+  })
+  const lineProgress = interpolate(progress, [0, 1], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
   })
 
   return (
@@ -146,39 +162,34 @@ export const AnimatedLineChart: React.FC<AnimatedLineChartProps> = ({
 
           {/* LINE PATH */}
           <path
-            d={data.values
-              .map((value, i) => {
-                const x = i * stepX
-                const y =
-                  innerHeight - (value / maxValue) * innerHeight
-                return `${i === 0 ? "M" : "L"} ${x} ${y}`
-              })
+            d={points
+              .map((point, i) => `${i === 0 ? "M" : "L"} ${point.x} ${point.y}`)
               .join(" ")}
             fill="none"
             stroke={theme.primaryColor}
             strokeWidth={4}
-            strokeDasharray={innerWidth}
-            strokeDashoffset={interpolate(
-              progress,
-              [0, 1],
-              [innerWidth, 0]
-            )}
+            strokeDasharray={pathLength}
+            strokeDashoffset={pathLength * (1 - lineProgress)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
 
           {/* POINTS */}
           {data.values.map((value, i) => {
-            const x = i * stepX
-            const y =
-              innerHeight - (value / maxValue) * innerHeight
-
-            const pointScale = spring({
-              frame: frame - i * 4,
-              fps,
-              config: { damping: 200 },
-            })
+            const { x, y } = points[i]
+            const arrival = data.values.length > 1 ? i / (data.values.length - 1) : 0
+            const pointProgress = interpolate(
+              lineProgress,
+              [Math.max(0, arrival - 0.025), Math.min(1, arrival + 0.025)],
+              [0, 1],
+              {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }
+            )
 
             const animatedValue = Math.round(
-              interpolate(pointScale, [0, 1], [0, value])
+              interpolate(pointProgress, [0, 1], [0, value])
             )
 
             return (
@@ -186,8 +197,10 @@ export const AnimatedLineChart: React.FC<AnimatedLineChartProps> = ({
                 <circle
                   cx={x}
                   cy={y}
-                  r={interpolate(pointScale, [0, 1], [0, 6])}
+                  r={interpolate(pointProgress, [0, 1], [0, 7])}
                   fill={theme.primaryColor}
+                  stroke={theme.backgroundColor}
+                  strokeWidth={3}
                 />
 
                 {/* VALUE */}

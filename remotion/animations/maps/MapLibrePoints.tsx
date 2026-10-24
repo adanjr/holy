@@ -20,9 +20,10 @@ interface MapLibrePointsProps {
   animation?: {
     durationInFrames?: number
   }
+  theme?: any
 }
 
-export const MapLibrePoints = ({ data, animation }: MapLibrePointsProps) => {
+export const MapLibrePoints = ({ data, animation, theme }: MapLibrePointsProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
@@ -43,8 +44,9 @@ export const MapLibrePoints = ({ data, animation }: MapLibrePointsProps) => {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style:
-        "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      style: ["#F", "#E", "#D"].some((prefix) => theme?.backgroundColor?.toUpperCase().startsWith(prefix))
+        ? "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+        : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center: [data.points[0].lng, data.points[0].lat],
       zoom: 3.2,
       pitch: 30,
@@ -79,15 +81,14 @@ export const MapLibrePoints = ({ data, animation }: MapLibrePointsProps) => {
         circle.style.width = "44px"
         circle.style.height = "44px"
         circle.style.borderRadius = "50%"
-        circle.style.background =
-          "linear-gradient(135deg,#00e5ff,#00bcd4)"
+        circle.style.background = theme?.primaryColor || "#00bcd4"
         circle.style.display = "flex"
         circle.style.alignItems = "center"
         circle.style.justifyContent = "center"
         circle.style.fontWeight = "bold"
-        circle.style.color = "#002b36"
+        circle.style.color = theme?.backgroundColor || "#002b36"
         circle.style.fontSize = "15px"
-        circle.style.boxShadow = "0 0 18px rgba(0,229,255,0.9)"
+        circle.style.boxShadow = `0 0 18px ${theme?.primaryColor || "#00e5ff"}`
         circle.style.border = "2px solid white"
 
         if (point.value !== undefined && point.value !== null) {

@@ -47,7 +47,7 @@ export const DisclaimerScreen: React.FC<DisclaimerScreenProps> = ({
   const scale = interpolate(intro, [0, 1], [0.96, 1])
 
   /* ----------------------------- */
-  /* Tamaño dinámico inteligente */
+  /* TamaÃ±o dinÃ¡mico inteligente */
   /* ----------------------------- */
 
   const textLength = data?.text?.length || 0
@@ -66,8 +66,8 @@ export const DisclaimerScreen: React.FC<DisclaimerScreenProps> = ({
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: data?.backgroundColor || "#000",
-        color: "#fff",
+        backgroundColor: theme.backgroundColor || data?.backgroundColor || "#000",
+        color: theme.textColor || "#fff",
         fontFamily: theme.fontFamily,
         justifyContent: "center",
         alignItems: "center",
@@ -76,15 +76,14 @@ export const DisclaimerScreen: React.FC<DisclaimerScreenProps> = ({
     >
 
       {/* ----------------------------- */}
-      {/* Vignette cinematográfico */}
+      {/* Vignette cinematogrÃ¡fico */}
       {/* ----------------------------- */}
 
       <div
         style={{
           position: "absolute",
           inset: 0,
-          background:
-            "radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.75) 100%)",
+          background: `radial-gradient(circle at center, transparent 40%, ${theme.primaryColor}22 100%)`,
           pointerEvents: "none"
         }}
       />
@@ -122,7 +121,7 @@ export const DisclaimerScreen: React.FC<DisclaimerScreenProps> = ({
       >
 
         {/* ----------------------------- */}
-        {/* Título */}
+        {/* TÃ­tulo */}
         {/* ----------------------------- */}
 
         {title && (
@@ -166,8 +165,7 @@ export const DisclaimerScreen: React.FC<DisclaimerScreenProps> = ({
           bottom: 0,
           height: 140,
           width: "100%",
-          background:
-            "linear-gradient(to bottom, transparent, rgba(0,0,0,0.9))"
+          background: `linear-gradient(to bottom, transparent, ${theme.primaryColor}33)`
         }}
       />
 

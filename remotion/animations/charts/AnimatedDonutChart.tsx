@@ -98,9 +98,9 @@ interface DonutItem {
   return (
     <AbsoluteFill
       style={{
-        background: theme?.background ?? "#000",
-        color: theme?.text ?? "#fff",
-        fontFamily: theme?.font ?? "sans-serif",
+        backgroundColor: theme?.backgroundColor ?? "#000",
+        color: theme?.textColor ?? "#fff",
+        fontFamily: theme?.fontFamily ?? "sans-serif",
         justifyContent: "center",
         alignItems: "center",
       }}
@@ -113,8 +113,9 @@ interface DonutItem {
         <g transform="translate(250,250) rotate(-90)">
           {normalized.map((item, i) => {
             const percent = item.value / total
-            const dash = circumference * percent
-            const offset = circumference * (1 - cumulativePercent)
+            const segmentLength = circumference * percent
+            const animatedLength = segmentLength * progress
+            const offset = -circumference * cumulativePercent
 
             cumulativePercent += percent
 
@@ -127,9 +128,9 @@ interface DonutItem {
                 fill="transparent"
                 stroke={palette[i % palette.length]}
                 strokeWidth={strokeWidth}
-                strokeDasharray={`${dash} ${circumference}`}
-                strokeDashoffset={offset * (1 - progress)}
-                strokeLinecap="round"
+                strokeDasharray={`${animatedLength} ${circumference - animatedLength}`}
+                strokeDashoffset={offset}
+                strokeLinecap="butt"
               />
             )
           })}

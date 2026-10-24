@@ -29,8 +29,8 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
   app.post("/renders", async (req, res) => {
     const { inputProps, videoConfig } = req.body;
 
-     console.log("📥 Received videoConfig:", videoConfig);
-      console.log("📥 Received scenes:", inputProps.scenes.map(s => ({
+     console.log("ðŸ“¥ Received videoConfig:", videoConfig);
+      console.log("ðŸ“¥ Received scenes:", inputProps.scenes.map((s: any) => ({
         id: s.id,
         duration: s.duration,
         type: typeof s.duration
