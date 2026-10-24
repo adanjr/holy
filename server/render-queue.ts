@@ -101,7 +101,7 @@ export const makeRenderQueue = ({
       await renderMedia({
         cancelSignal,
         serveUrl,
-        browserExecutable: "/usr/bin/google-chrome-stable",
+        browserExecutable: null,
         composition,
         inputProps,
         codec: "h264",       
