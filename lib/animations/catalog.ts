@@ -233,6 +233,18 @@ export const visualizationCatalog: VisualizationDefinition[] = [
       "Present the three selected images as Innovation, Growth, and Global Reach. Introduce the panels one at a time from left to right, then hold all three together with their labels.",
   },
   {
+    id: "content.video-split",
+    legacyType: "video-split",
+    family: "media",
+    label: "Two Videos Side by Side",
+    description: "Play exactly two videos simultaneously in a balanced split screen.",
+    requiresAssets: 2,
+    acceptsAssets: true,
+    promptPlaceholder: "Optional title and labels for the left and right videos",
+    promptExample:
+      "Play the two selected videos side by side at the same time. Add the title Before and After. Label the left video Before and the right video After. Keep both videos visible for the entire animation.",
+  },
+  {
     id: "content.feature-cards",
     legacyType: "feature-cards",
     family: "structure",

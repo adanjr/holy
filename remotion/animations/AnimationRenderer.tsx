@@ -37,6 +37,7 @@ import { HubSpokes } from "./content/HubSpokes";
 import { BulletListSlide } from "./content/BulletListSlide";
 import { SideBySideComparison } from "./content/SideBySideComparison";
 import { FramedFootage } from "./content/FramedFootage";
+import { VideoSplit } from "./content/VideoSplit";
 import { themes } from "../../lib/themes";
 import { getVisualization } from "../../lib/animations/catalog";
 
@@ -401,6 +402,9 @@ export const AnimationRenderer: React.FC<AnimationRendererProps> = ({
 
       case "side-by-side-comparison":
         return <SideBySideComparison data={resolved.data || {}} animation={animationProps} theme={resolvedTheme} />;
+
+      case "video-split":
+        return <VideoSplit data={resolved.data || {}} animation={animationProps} theme={resolvedTheme} />;
 
       case "framed-footage":
         return <FramedFootage data={resolved.data || {}} animation={animationProps} theme={resolvedTheme} />;
