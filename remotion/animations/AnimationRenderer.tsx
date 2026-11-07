@@ -1,6 +1,8 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Easing,
+  Freeze,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
@@ -25,6 +27,7 @@ import { ConnectedNodesAnimation } from "./images/ConnectedNodesAnimation";
 import { DisclaimerScreen } from "./content/DisclaimerScreen";
 import { LogoReveal } from "./branding/LogoReveal";
 import { MediaOverlay } from "./content/MediaOverlay";
+import { CinematicImage } from "./CinematicImage";
 import { MultiPanel } from "./content/MultiPanel";
 import { QuoteCard } from "./content/QuoteCard";
 import { EditorialCover } from "./content/EditorialCover";
@@ -38,6 +41,7 @@ import { BulletListSlide } from "./content/BulletListSlide";
 import { SideBySideComparison } from "./content/SideBySideComparison";
 import { FramedFootage } from "./content/FramedFootage";
 import { VideoSplit } from "./content/VideoSplit";
+import { ProfessionalVideoEffects } from "./ProfessionalVideoEffects";
 import { themes } from "../../lib/themes";
 import { getVisualization } from "../../lib/animations/catalog";
 
@@ -80,7 +84,11 @@ export const AnimationRenderer: React.FC<AnimationRendererProps> = ({
     themes[resolved.theme as keyof typeof themes] ?? themes.finance;
 
   const requestedType = resolved.type || resolved.visualization || resolved.meta?.visualCategory;
-  const type = getVisualization(requestedType)?.legacyType || requestedType;
+  const visualizationDefinition = getVisualization(requestedType);
+  const type = visualizationDefinition?.legacyType || requestedType;
+  const showDesignFinish =
+    visualizationDefinition?.family !== "chart" &&
+    !["bar-chart", "bars", "line-chart", "line", "donut-chart", "donut"].includes(type);
 
   const animationProps = {
     ...resolved.animation,
@@ -112,6 +120,21 @@ export const AnimationRenderer: React.FC<AnimationRendererProps> = ({
   });
   const sceneScale = interpolate(entrance, [0, 1], [1 + 0.012 * intensity, 1]);
   const sceneOffset = interpolate(entrance, [0, 1], [8 * intensity, 0]);
+  const lastFrame = Math.max(1, sceneDuration - 1);
+  const progress = Math.min(1, Math.max(0, frame / lastFrame));
+  const motionProgressByPreset: Record<string, number> = {
+    energetic: interpolate(progress, [0, 0.72, 1], [0, 1, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    }),
+    smooth: Easing.inOut(Easing.cubic)(progress),
+    cinematic: Easing.inOut(Easing.quad)(Math.pow(progress, 1.35)),
+    minimal: progress,
+  };
+  const motionProgress =
+    motionProgressByPreset[resolved.motionPreset] ?? motionProgressByPreset.smooth;
+  const motionFrame = Math.round(motionProgress * lastFrame);
 
   const content = (() => {
     switch (type) {
@@ -325,6 +348,15 @@ export const AnimationRenderer: React.FC<AnimationRendererProps> = ({
           />
         );
 
+      case "cinematic-image":
+        return (
+          <CinematicImage
+            data={resolved.data}
+            animation={animationProps}
+            theme={resolvedTheme}
+          />
+        );
+
       case "quote-card":
         return (
           <QuoteCard
@@ -409,6 +441,9 @@ export const AnimationRenderer: React.FC<AnimationRendererProps> = ({
       case "framed-footage":
         return <FramedFootage data={resolved.data || {}} animation={animationProps} theme={resolvedTheme} />;
 
+      case "professional-video-effects":
+        return <ProfessionalVideoEffects data={resolved.data || {}} animation={animationProps} theme={resolvedTheme} />;
+
       default:
         return (
           <AbsoluteFill
@@ -458,7 +493,21 @@ export const AnimationRenderer: React.FC<AnimationRendererProps> = ({
           transformOrigin: "center",
         }}
       >
-        {content}
+        <Freeze frame={motionFrame}>{content}</Freeze>
+        {showDesignFinish && (
+          <AbsoluteFill style={{ pointerEvents: "none", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, boxShadow: "inset 0 0 110px rgba(0,0,0,.16)" }} />
+            <div style={{ position: "absolute", inset: 0, opacity: 0.035, backgroundImage: "radial-gradient(circle, currentColor .7px, transparent .8px)", backgroundSize: "7px 7px", color: resolvedTheme.textColor }} />
+            <div style={{ position: "absolute", left: 34, top: 30, width: 46, height: 5, borderRadius: 99, background: resolvedTheme.primaryColor, opacity: 0.9 }} />
+            <div style={{ position: "absolute", left: 34, top: 44, color: resolvedTheme.textSecondary, fontFamily: resolvedTheme.fontFamily, fontSize: 11, fontWeight: 800, letterSpacing: 2.4, textTransform: "uppercase", opacity: 0.62 }}>
+              {visualizationDefinition?.family || "visual"}
+            </div>
+            <div style={{ position: "absolute", inset: 18, border: `1px solid ${resolvedTheme.textColor}12`, borderRadius: 18 }} />
+            <div style={{ position: "absolute", left: 18, right: 18, bottom: 18, height: 3, borderRadius: 99, overflow: "hidden", background: `${resolvedTheme.textColor}0d` }}>
+              <div style={{ width: `${progress * 100}%`, height: "100%", borderRadius: 99, background: resolvedTheme.primaryColor, opacity: 0.72 }} />
+            </div>
+          </AbsoluteFill>
+        )}
       </div>
     </AbsoluteFill>
   );

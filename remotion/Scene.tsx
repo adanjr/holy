@@ -52,11 +52,15 @@ type SceneAsset = {
   type: "IMAGE" | "VIDEO" | "ANIMATION";
   originalUrl: string;
   storedUrl?: string;
+  previewUrl?: string;
   name: string;
   order?: number;
   duration?: number;
   sourceStart?: number;
   sourceEnd?: number;
+  volume?: number;
+  hasAudio?: boolean;
+  muted?: boolean;
   animationData?: any;
   effects?: SceneEffect[];
 };
@@ -180,7 +184,7 @@ const ImageAsset = ({ asset, fps }: { asset: SceneAsset; fps: number }) => {
 
   return (
     <Img
-      src={asset.storedUrl || asset.originalUrl}
+      src={asset.storedUrl || asset.previewUrl || asset.originalUrl}
       style={{
         width: "100%",
         height: "100%",
@@ -202,8 +206,9 @@ const VideoAsset = ({ asset, fps }: { asset: SceneAsset; fps: number }) => {
       : undefined;
   return (
     <OffthreadVideo
-      src={asset.storedUrl || asset.originalUrl}
-      muted
+      src={asset.storedUrl || asset.previewUrl || asset.originalUrl}
+      muted={asset.muted === true || asset.hasAudio === false}
+      volume={Math.min(1, Math.max(0, asset.volume ?? 0.2))}
       trimBefore={trimBefore}
       trimAfter={trimAfter}
       style={{
@@ -242,7 +247,13 @@ export const Scene = ({
         duration: a.duration ?? a.asset?.duration ?? 8,
         sourceStart: a.sourceStart ?? 0,
         sourceEnd: a.sourceEnd ?? undefined,
-        animationData: a.animationEffect?.data || a.animationData,
+        volume: a.volume ?? 0.2,
+        hasAudio: a.hasAudio ?? true,
+        muted: a.muted ?? false,
+        animationData:
+          a.animationEffect?.data ||
+          a.animationData ||
+          a.animations?.[0]?.data,
         // Normalizamos el startTime del efecto para que sea relativo a 0
         // en la Sequence de Remotion.
         effects: (a.effects || []).map((effect: any) => ({
@@ -386,6 +397,7 @@ export const Scene = ({
             <BroadcastTextOverlay
               overlay={{
                 ...overlay,
+                kineticTime: adjustedFrame / fps,
                 text:
                   overlay.text && overlay.text !== "textOverlay"
                     ? overlay.text

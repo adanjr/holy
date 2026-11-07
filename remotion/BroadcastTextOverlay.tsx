@@ -13,6 +13,7 @@ export type BroadcastOverlayData = {
   letterSpacing?: number | null;
   textAlign?: string | null;
   styleOptions?: Record<string, unknown> | null;
+  kineticTime?: number;
 };
 
 type Props = { overlay: BroadcastOverlayData; preview?: boolean };
@@ -76,6 +77,7 @@ export const broadcastPresets = [
   { value: "callout", label: "Callout", description: "Accent label and pointer" },
   { value: "credits", label: "Credits", description: "Name, role and organization" },
   { value: "countdown", label: "Countdown", description: "Centered countdown card" },
+  { value: "kinetic", label: "Kinetic promo", description: "Staggered words with color accents" },
 ] as const;
 
 export function BroadcastTextOverlay({ overlay, preview = false }: Props) {
@@ -126,6 +128,25 @@ export function BroadcastTextOverlay({ overlay, preview = false }: Props) {
   const lineHeight = numberOption("lineHeight", 1.05);
   const textTransform = stringOption("textTransform", "none") as CSSProperties["textTransform"];
   Object.assign(textStyle, { lineHeight, textTransform, WebkitTextStroke: outlineWidth ? `${outlineWidth}px ${outlineColor}` : undefined, textShadow: `0 3px ${shadowBlur}px ${shadowColor}` });
+  if (preset === "kinetic") {
+    const words = (overlay.text || "YOUR OFFER STARTS NOW").trim().split(/\s+/).filter(Boolean);
+    const time = overlay.kineticTime ?? Number.POSITIVE_INFINITY;
+    const stagger = Math.max(0.03, numberOption("kineticStagger", 0.14));
+    const entryDuration = Math.max(0.08, numberOption("kineticEntryDuration", 0.28));
+    const effect = stringOption("kineticEffect", "pop");
+    const accents = new Set(stringOption("kineticAccentWords", "").split(",").map((word) => word.trim().toLocaleLowerCase()).filter(Boolean));
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start", gap: `${fontSize * 0.18}px ${fontSize * 0.25}px`, maxWidth, padding: `${paddingY}px ${paddingX}px`, background, borderRadius: radius, boxShadow: shadowBlur ? `0 8px ${shadowBlur}px ${shadowColor}` : undefined }}>
+        {words.map((word, index) => {
+          const progress = Math.max(0, Math.min(1, (time - index * stagger) / entryDuration));
+          const normalized = word.replace(/[^\p{L}\p{N}%]/gu, "").toLocaleLowerCase();
+          const highlighted = accents.has(normalized) || accents.has(word.toLocaleLowerCase());
+          const transform = effect === "slideUp" ? `translateY(${(1 - progress) * 0.9}em)` : effect === "slideLeft" ? `translateX(${(1 - progress) * 0.9}em)` : effect === "pop" ? `scale(${0.35 + progress * 0.65})` : "none";
+          return <span key={`${word}-${index}`} style={{ ...textStyle, display: "inline-block", color: highlighted ? accent : textStyle.color, fontSize: highlighted ? fontSize * 1.14 : fontSize, opacity: progress, filter: effect === "blur" ? `blur(${(1 - progress) * 14}px)` : undefined, transform, transformOrigin: "center bottom" }}>{word}</span>;
+        })}
+      </div>
+    );
+  }
 
   if (preset === "location")
     return (
