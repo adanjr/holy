@@ -55,6 +55,11 @@ function setupApp({ remotionBundleUrl }: { remotionBundleUrl: string }) {
     const jobId = req.params.jobId;
     const job = queue.jobs.get(jobId);
 
+    if (!job) {
+      res.status(404).json({ error: "Render job not found. The render service may have restarted." });
+      return;
+    }
+
     res.json(job);
   });
 

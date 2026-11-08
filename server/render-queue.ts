@@ -42,11 +42,13 @@ type JobState =
     }
   | {
       status: "failed";
-      error: Error;
+      error: string;
       data: JobData;
     };
 
 const compositionId = "Video";
+const MAX_RENDER_MS = Number(process.env.RENDER_MAX_MS || 6 * 60 * 60 * 1000);
+const STALLED_RENDER_MS = Number(process.env.RENDER_STALL_MS || 15 * 60 * 1000);
 
 const getRenderEnvVariables = () => {
   const envVariables: Record<string, string> = {};
@@ -90,6 +92,12 @@ export const makeRenderQueue = ({
       data: job.data,
     });
 
+    let lastProgressAt = Date.now();
+    const totalTimeout = setTimeout(() => cancel(), MAX_RENDER_MS);
+    const stallWatchdog = setInterval(() => {
+      if (Date.now() - lastProgressAt > STALLED_RENDER_MS) cancel();
+    }, 30_000);
+
     try {
       const { inputProps } = job.data;
 
@@ -126,6 +134,7 @@ export const makeRenderQueue = ({
         codec: "h264",       
 
         onProgress: (progress) => {
+          lastProgressAt = Date.now();
           console.info(`${jobId} render progress:`, progress.progress);
           jobs.set(jobId, {
             progress: progress.progress,
@@ -161,9 +170,12 @@ export const makeRenderQueue = ({
       console.error(error);
       jobs.set(jobId, {
         status: "failed",
-        error: error as Error,
+        error: error instanceof Error ? error.message : "Render failed unexpectedly",
         data: job.data,
       });
+    } finally {
+      clearTimeout(totalTimeout);
+      clearInterval(stallWatchdog);
     }
   };
 
@@ -182,7 +194,9 @@ export const makeRenderQueue = ({
       },
     });
 
-    queue = queue.then(() => processRender(jobId));
+    queue = queue
+      .catch((error) => console.error("Previous render queue task failed", error))
+      .then(() => processRender(jobId));
   };
 
   function createJob(data: JobData) {
